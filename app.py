@@ -5,479 +5,505 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 import requests
 
-# Set page configuration
 st.set_page_config(
-    page_title="Al-Meharban Foundation - Volunteer ID Card Generator",
+    page_title="Al-Meharban Foundation - Dual Card Generator",
     page_icon="🪪",
     layout="wide"
 )
 
-# Custom Styling to match Deep Emerald Green theme
 st.markdown("""
     <style>
     .main-title {
         color: #005A2D;
-        font-family: 'Outfit', 'Inter', 'Segoe UI', sans-serif;
         font-weight: 800;
-        font-size: 2.5rem;
-        margin-bottom: 0px;
+        font-size: 2.4rem;
+        margin-bottom: 0;
     }
-    .sub-title {
-        color: #555555;
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-        font-size: 1.1rem;
-        margin-bottom: 30px;
-    }
-    .instructions {
-        background-color: #27a131;
-        border-left: 5px solid #005A2D;
-        padding: 15px;
-        border-radius: 4px;
-        margin-bottom: 20px;
-        font-family: 'Inter', sans-serif;
-        font-size: 0.95rem;
-    }
-    /* Style download buttons */
-    div.stButton > button:first-child {
+    .sub-title { color: #666; font-size: 1rem; margin-bottom: 24px; }
+    .card-label { font-weight: 700; font-size: 1.1rem; color: #005A2D; margin-bottom: 6px; }
+    div.stButton > button {
         background-color: #005A2D !important;
         color: white !important;
         border-radius: 8px !important;
         border: none !important;
-        padding: 12px 28px !important;
-        font-size: 1rem !important;
-        font-weight: bold !important;
+        padding: 10px 24px !important;
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
         width: 100% !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
     }
-    div.stButton > button:first-child:hover {
-        background-color: #004020 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 12px rgba(0, 90, 45, 0.25) !important;
-    }
+    div.stButton > button:hover { background-color: #004020 !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Define directories
 FONT_DIR = "fonts"
 os.makedirs(FONT_DIR, exist_ok=True)
 
-# Font URLs and local paths
+# ── Robust logo path resolution — tries multiple locations ──
+def _find_logo_path():
+    candidates = []
+    try:
+        candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "amf_logo_nobg.jpg"))
+    except Exception:
+        pass
+    candidates.append(os.path.join(os.getcwd(), "amf_logo_nobg.jpg"))
+    candidates.append(os.path.join(os.getcwd(), "amf_logo.jpeg"))
+    candidates.append("/home/claude/amf_logo_nobg.jpg")
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+DEFAULT_LOGO_PATH = _find_logo_path()
+
+@st.cache_resource
+def _preload_logo():
+    path = _find_logo_path()
+    if path:
+        try:
+            return Image.open(path).convert("RGBA")
+        except Exception:
+            pass
+    return None
+
 FONTS = {
     "roboto_regular": {
         "url": "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Regular.ttf",
-        "fallback": ["C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\calibri.ttf", "C:\\Windows\\Fonts\\segoeui.ttf"]
+        "fallback": ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "C:\\Windows\\Fonts\\arial.ttf"]
     },
     "roboto_bold": {
         "url": "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Bold.ttf",
-        "fallback": ["C:\\Windows\\Fonts\\arialbd.ttf", "C:\\Windows\\Fonts\\calibrib.ttf", "C:\\Windows\\Fonts\\segoeuib.ttf"]
+        "fallback": ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "C:\\Windows\\Fonts\\arialbd.ttf"]
     },
     "roboto_medium": {
         "url": "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Medium.ttf",
-        "fallback": ["C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\calibri.ttf", "C:\\Windows\\Fonts\\segoeui.ttf"]
+        "fallback": ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "C:\\Windows\\Fonts\\arial.ttf"]
     }
 }
 
 @st.cache_resource
 def load_font(font_key, size):
-    """
-    Downloads Roboto font files from Google Fonts and caches them locally.
-    Falls back gracefully to system fonts if offline, or default PIL font if none found.
-    """
     font_info = FONTS[font_key]
     local_path = os.path.join(FONT_DIR, f"{font_key}.ttf")
-    
-    # Try downloading if font file doesn't exist
     if not os.path.exists(local_path):
         try:
-            response = requests.get(font_info["url"], timeout=5)
-            if response.status_code == 200:
+            r = requests.get(font_info["url"], timeout=5)
+            if r.status_code == 200:
                 with open(local_path, "wb") as f:
-                    f.write(response.content)
+                    f.write(r.content)
         except Exception:
-            # Fall back silently if offline
             pass
-            
-    # Check if download succeeded and load it
     if os.path.exists(local_path):
         try:
             return ImageFont.truetype(local_path, size)
         except Exception:
             pass
-            
-    # Fallback to system fonts
-    for fallback_path in font_info["fallback"]:
-        if os.path.exists(fallback_path):
+    for fp in font_info["fallback"]:
+        if os.path.exists(fp):
             try:
-                return ImageFont.truetype(fallback_path, size)
+                return ImageFont.truetype(fp, size)
             except Exception:
                 pass
-                
-    # Ultimate fallback
     return ImageFont.load_default()
 
 def get_autoscaled_font(draw, text, font_key, max_width, initial_size):
-    """
-    Measures text size and dynamically shrinks the font size until it fits within max_width.
-    """
     size = initial_size
     while size > 10:
         font = load_font(font_key, size)
         bbox = draw.textbbox((0, 0), text, font=font)
-        w = bbox[2] - bbox[0]
-        if w <= max_width:
+        if (bbox[2] - bbox[0]) <= max_width:
             return font
         size -= 2
     return load_font(font_key, 10)
 
 def draw_centered_text(draw, text, y, font, fill_color, canvas_width=660):
-    """
-    Draws text perfectly centered horizontally at y-coordinate.
-    """
     bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    x = (canvas_width - text_width) / 2
+    x = (canvas_width - (bbox[2] - bbox[0])) / 2
     draw.text((x, y), text, fill=fill_color, font=font)
 
-def generate_id_card(name, volunteer_id, role, blood_group, validity_date, profile_image, signature_image=None):
-    """
-    Generates a 660x1020 high-quality CR80 vertical ID card using Pillow.
-    """
-    # 1. Initialize canvas (White background)
+def paste_logo(card, logo_img, x, y, target_size):
+    try:
+        lw, lh = logo_img.size
+        scale = target_size / max(lw, lh)
+        nw, nh = int(lw * scale), int(lh * scale)
+        resized = logo_img.resize((nw, nh), Image.Resampling.LANCZOS)
+        ox = x + (target_size - nw) // 2
+        oy = y + (target_size - nh) // 2
+        if resized.mode == 'RGBA':
+            card.paste(resized, (ox, oy), resized)
+        else:
+            resized_rgba = resized.convert("RGBA")
+            card.paste(resized_rgba, (ox, oy), resized_rgba)
+    except Exception:
+        pass
+
+def load_default_logo():
+    cached = _preload_logo()
+    if cached is not None:
+        return cached
+    path = _find_logo_path()
+    if path and os.path.exists(path):
+        try:
+            return Image.open(path).convert("RGBA")
+        except Exception:
+            pass
+    return None
+
+# ═══════════════════════════════════════════════════
+#  CARD 1 — VOLUNTEER ID CARD  (660 × 1020)
+# ═══════════════════════════════════════════════════
+def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
+                     profile_image, signature_image=None, logo_image=None):
     card = Image.new("RGBA", (660, 1020), "white")
     draw = ImageDraw.Draw(card)
-    
-    # 2. Draw thick deep emerald green outer border
-    # Outer bounds: 10, 10 to 650, 1010
+
+    # Outer border
     draw.rectangle([10, 10, 650, 1010], outline="#005A2D", width=8)
-    
-    # 3. Header Banner (Solid green block)
-    # Inside bounds: 14 to 646. Y: 14 to 170
-    draw.rectangle([14, 14, 646, 170], fill="#005A2D")
-    
-    # Golden border stripe separating header and body
-    draw.rectangle([14, 170, 646, 176], fill="#D4AF37")
-    
-    # 4. Draw Header Branding & Logo
-    # Draw logo emblem (crescent & star)
-    draw.ellipse([305, 25, 355, 75], fill="#005A2D", outline="#D4AF37", width=2)
-    # Draw crescent
-    draw.ellipse([312, 32, 342, 62], fill="#D4AF37")
-    draw.ellipse([317, 30, 345, 58], fill="#005A2D")
-    # Draw star
-    draw.ellipse([336, 38, 340, 42], fill="#D4AF37")
-    
-    # Header main text
-    header_font = load_font("roboto_bold", 24)
-    draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 92, header_font, "white")
-    
-    # Header subtext
-    sub_font = load_font("roboto_regular", 14)
-    draw_centered_text(draw, "Every Life Matters, Every Smile Counts", 128, sub_font, "#E0E0E0")
-    
-    # 5. Profile Picture (W: 260, H: 290, centered)
-    # X coordinates: 200 to 460
-    # Y coordinates: 215 to 505
-    photo_x1, photo_y1 = 200, 215
-    photo_x2, photo_y2 = 460, 505
-    
-    # Draw profile frame border (grey outline)
-    draw.rectangle([photo_x1 - 3, photo_y1 - 3, photo_x2 + 3, photo_y2 + 3], outline="#CCCCCC", width=3)
-    
+
+    # Header banner
+    draw.rectangle([14, 14, 646, 185], fill="#005A2D")
+    draw.rectangle([14, 185, 646, 191], fill="#D4AF37")
+
+    # ── Problem 1 Solution: Logo Centered in Header ──
+    logo = logo_image or load_default_logo()
+    if logo:
+        logo_bg_size = 80
+        logo_bg_x = (660 - logo_bg_size) // 2
+        logo_bg_y = 18
+        paste_logo(card, logo, logo_bg_x, logo_bg_y, logo_bg_size)
+    else:
+        draw.ellipse([305, 25, 355, 75], fill="#005A2D", outline="#D4AF37", width=2)
+
+    # Header text shifted cleanly downwards to look professional below the centered logo
+    header_font = load_font("roboto_bold", 22)
+    draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 104, header_font, "white", 660)
+    sub_font = load_font("roboto_regular", 13)
+    draw_centered_text(draw, "Every Life Matters, Every Smile Counts", 136, sub_font, "#D4F0C8", 660)
+    tagline_font = load_font("roboto_regular", 11)
+    draw_centered_text(draw, "Together We Care, Together We Change", 158, tagline_font, "#aaddaa", 660)
+
+    # ── Profile photo ──
+    px1, py1, px2, py2 = 220, 215, 440, 475
+    draw.rectangle([px1 - 3, py1 - 3, px2 + 3, py2 + 3], outline="#CCCCCC", width=3)
     if profile_image is not None:
-        # Load and cover crop the image to 260x290
         try:
-            w, h = profile_image.size
-            target_w, target_h = 260, 290
-            target_aspect = target_w / target_h
-            img_aspect = w / h
-            
-            if img_aspect > target_aspect:
-                new_width = int(h * target_aspect)
-                left = (w - new_width) // 2
-                right = left + new_width
-                top, bottom = 0, h
+            pw, ph = profile_image.size
+            tw, th = 220, 260
+            if pw / ph > tw / th:
+                nw = int(ph * tw / th)
+                cropped = profile_image.crop(((pw - nw) // 2, 0, (pw - nw) // 2 + nw, ph))
             else:
-                new_height = int(w / target_aspect)
-                top = (h - new_height) // 2
-                bottom = top + new_height
-                left, right = 0, w
-                
-            cropped_img = profile_image.crop((left, top, right, bottom))
-            resized_img = cropped_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-            
-            # Paste into canvas
-            card.paste(resized_img, (photo_x1, photo_y1))
-        except Exception as e:
-            # Fall back to drawing placeholder in case of error
-            draw.rectangle([photo_x1, photo_y1, photo_x2, photo_y2], fill="#F0F0F0")
-            draw.ellipse([295, 275, 365, 345], fill="#CCCCCC")
-            draw.chord([240, 365, 420, 475], start=180, end=360, fill="#CCCCCC")
-    else:
-        # Vector placeholder profile drawing
-        draw.rectangle([photo_x1, photo_y1, photo_x2, photo_y2], fill="#F0F0F0")
-        # Head (centered at 330, Y=310, r=35)
-        draw.ellipse([295, 275, 365, 345], fill="#CCCCCC")
-        # Shoulders (arch centered at 330, Y=365)
-        draw.chord([240, 365, 420, 475], start=180, end=360, fill="#CCCCCC")
-        
-    # 6. Volunteer Name & Role Details
-    # Auto-scale volunteer name to fit card width (max width 520px)
-    name_font = get_autoscaled_font(draw, name.strip(), "roboto_bold", 520, 32)
-    draw_centered_text(draw, name.strip(), 540, name_font, "#005A2D")
-    
-    # Volunteer Role (Gold/Amber accent)
-    role_font = get_autoscaled_font(draw, role.strip(), "roboto_medium", 520, 22)
-    draw_centered_text(draw, role.strip(), 588, role_font, "#B46400")
-    
-    # 7. Metadata Grid Card (ID, Blood Group, Validity)
-    # Box: X [80, 580], Y [635, 815]
-    draw.rectangle([80, 635, 580, 815], fill="#F7FBF8", outline="#E2ECE5", width=2)
-    
-    label_font = load_font("roboto_bold", 17)
-    val_font = load_font("roboto_medium", 17)
-    
-    # Rows Y-coordinates
-    r1_y = 658
-    r2_y = 712
-    r3_y = 766
-    
-    # Labels (X = 110)
-    draw.text((115, r1_y), "VOLUNTEER ID :", fill="#555555", font=label_font)
-    draw.text((115, r2_y), "BLOOD GROUP  :", fill="#555555", font=label_font)
-    draw.text((115, r3_y), "VALID UNTIL  :", fill="#555555", font=label_font)
-    
-    # Values (X = 300)
-    draw.text((300, r1_y), volunteer_id.strip().upper(), fill="#111111", font=val_font)
-    
-    # Blood Group highlights in red if valid blood group format
-    bg_clean = blood_group.strip().upper()
-    bg_color = "#B30000" if any(x in bg_clean for x in ["A", "B", "O", "AB"]) else "#111111"
-    draw.text((300, r2_y), bg_clean, fill=bg_color, font=val_font)
-    
-    draw.text((300, r3_y), validity_date.strip(), fill="#111111", font=val_font)
-    
-    # 8. Barcode & Signature
-    # Draw simulated barcode based on volunteer_id hash for uniqueness
-    random.seed(volunteer_id)
-    bar_x = 90
-    bar_y_start = 845
-    bar_y_end = 890
-    
-    while bar_x < 270:
-        bar_width = random.choice([2, 3, 4, 6])
-        draw.rectangle([bar_x, bar_y_start, bar_x + bar_width - 1, bar_y_end], fill="black")
-        gap_width = random.choice([2, 3, 4])
-        bar_x += bar_width + gap_width
-        
-    # Under barcode text
-    barcode_text_font = load_font("roboto_regular", 11)
-    draw.text((120, 898), f"*{volunteer_id.strip().upper()}*", fill="#555555", font=barcode_text_font)
-    
-    # Draw signature line & text
-    draw.line([390, 882, 570, 882], fill="#888888", width=2)
-    
-    # Try using uploaded signature or fallback to signature_no_bg.png
-    sig_to_draw = signature_image
-    if sig_to_draw is None:
-        default_sig_path = "signature_no_bg.png"
-        if os.path.exists(default_sig_path):
-            try:
-                sig_to_draw = Image.open(default_sig_path)
-            except Exception:
-                pass
-                
-    if sig_to_draw is not None:
-        try:
-            # Resize signature image to fit the signature area
-            # The area width is 180, height could be around 60 (from Y=820 to 880)
-            sig_w, sig_h = sig_to_draw.size
-            max_sig_w = 180
-            max_sig_h = 60
-            
-            # Calculate aspect ratio
-            aspect = sig_w / sig_h
-            if sig_w > max_sig_w or sig_h > max_sig_h:
-                if aspect > max_sig_w / max_sig_h:
-                    new_w = max_sig_w
-                    new_h = int(max_sig_w / aspect)
-                else:
-                    new_h = max_sig_h
-                    new_w = int(max_sig_h * aspect)
-            else:
-                new_w, new_h = sig_w, sig_h
-                
-            resized_sig = sig_to_draw.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            
-            # Center horizontally in the 390-570 region (width 180)
-            # Paste signature slightly above the line at Y=882
-            sig_x = 390 + (180 - new_w) // 2
-            sig_y = 880 - new_h
-            
-            if resized_sig.mode == 'RGBA':
-                card.paste(resized_sig, (sig_x, sig_y), resized_sig)
-            else:
-                card.paste(resized_sig, (sig_x, sig_y))
+                nh = int(pw * th / tw)
+                cropped = profile_image.crop((0, (ph - nh) // 2, pw, (ph - nh) // 2 + nh))
+            resized = cropped.resize((tw, th), Image.Resampling.LANCZOS)
+            card.paste(resized, (px1, py1))
         except Exception:
-            # Fallback to simulated signature on error
-            draw.line([410, 876, 428, 860, 455, 877, 482, 856, 510, 872, 538, 861, 560, 874], fill="#1C3D82", width=2)
+            _placeholder_photo(draw, px1, py1, px2, py2)
     else:
-        # Simulated cursive blue ink signature
-        draw.line([410, 876, 428, 860, 455, 877, 482, 856, 510, 872, 538, 861, 560, 874], fill="#1C3D82", width=2)
-    
-    sig_font = load_font("roboto_bold", 11)
-    draw.text((410, 890), "AUTHORIZED SIGNATURE", fill="#777777", font=sig_font)
-    
-    # 9. Footer Ribbon
-    # Golden line separating body and footer
-    draw.rectangle([14, 944, 646, 950], fill="#D4AF37")
-    # Solid green block
-    draw.rectangle([14, 950, 646, 1006], fill="#005A2D")
-    
-    # Footer Notice text
-    footer_font = load_font("roboto_regular", 13)
-    draw_centered_text(draw, "If found, please return to office or contact admin.", 968, footer_font, "white")
-    
+        _placeholder_photo(draw, px1, py1, px2, py2)
+
+    # ── Name & Role ──
+    name_font = get_autoscaled_font(draw, name.strip(), "roboto_bold", 520, 30)
+    draw_centered_text(draw, name.strip(), 510, name_font, "#005A2D", 660)
+    role_font = get_autoscaled_font(draw, role.strip(), "roboto_medium", 520, 20)
+    draw_centered_text(draw, role.strip(), 555, role_font, "#B46400", 660)
+
+    # ── Info grid ──
+    draw.rectangle([80, 610, 580, 790], fill="#F7FBF8", outline="#E2ECE5", width=2)
+    lf = load_font("roboto_bold", 16)
+    vf = load_font("roboto_medium", 16)
+    rows = [(625, "VOLUNTEER ID :", volunteer_id.strip().upper(), "#111111"),
+            (675, "BLOOD GROUP  :", blood_group.strip().upper(),
+             "#B30000" if any(x in blood_group.upper() for x in ["A","B","O"]) else "#111111"),
+            (725, "VALID UNTIL  :", validity_date.strip(), "#111111")]
+    for ry, label, val, vc in rows:
+        draw.text((115, ry), label, fill="#555555", font=lf)
+        draw.text((300, ry), val,   fill=vc,        font=vf)
+
+    # ── Barcode ──
+    random.seed(volunteer_id)
+    bx = 90
+    while bx < 270:
+        bw = random.choice([2, 3, 4])
+        draw.rectangle([bx, 830, bx + bw - 1, 875], fill="black")
+        bx += bw + random.choice([2, 3])
+    draw.text((120, 882), f"*{volunteer_id.strip().upper()}*", fill="#555555", font=load_font("roboto_regular", 11))
+
+    # ── Problem 2 Solution: Actual Signature Image ──
+    draw.line([390, 865, 570, 865], fill="#888888", width=2)
+    sig = signature_image
+    if sig is None and os.path.exists("signature_no_bg.png"):
+        try:
+            sig = Image.open("signature_no_bg.png")
+        except Exception:
+            pass
+    if sig:
+        try:
+            sw, sh = sig.size
+            mw, mh = 160, 50
+            aspect = sw / sh
+            nw = min(mw, int(mh * aspect))
+            nh = int(nw / aspect)
+            rs = sig.resize((nw, nh), Image.Resampling.LANCZOS)
+            sx = 390 + (180 - nw) // 2
+            sy = 865 - nh - 2
+            if rs.mode == 'RGBA':
+                card.paste(rs, (sx, sy), rs)
+            else:
+                card.paste(rs, (sx, sy))
+        except Exception:
+            _fallback_sig(draw)
+    else:
+        _fallback_sig(draw)
+        
+    draw.text((410, 873), "AUTHORIZED SIGNATURE", fill="#777777", font=load_font("roboto_bold", 10))
+
+    # ── Footer ──
+    draw.rectangle([14, 940, 646, 946], fill="#D4AF37")
+    draw.rectangle([14, 946, 646, 1006], fill="#005A2D")
+    draw_centered_text(draw, "If found, please return to office or contact admin.",
+                       965, load_font("roboto_regular", 12), "white", 660)
+
     return card
 
-# App Header Layout
-col_logo, col_title = st.columns([1, 12])
-with col_title:
-    st.markdown('<h1 class="main-title">Al-Meharban Foundation</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-title">Automated Volunteer ID Card Generator • High Quality & Print-Ready</p>', unsafe_allow_html=True)
 
-# Main columns: Left for Form input, Right for Real-time Card Preview
-col_form, col_preview = st.columns([7, 5])
+def _placeholder_photo(draw, x1, y1, x2, y2):
+    draw.rectangle([x1, y1, x2, y2], fill="#F0F0F0")
+    cx = (x1 + x2) // 2
+    draw.ellipse([cx - 45, y1 + 30, cx + 45, y1 + 120], fill="#CCCCCC")
+    draw.chord([cx - 80, y1 + 140, cx + 80, y2 - 10], start=180, end=360, fill="#CCCCCC")
+
+def _fallback_sig(draw):
+    draw.line([410, 858, 428, 845, 455, 860, 482, 842, 510, 856, 538, 846, 560, 858], fill="#1C3D82", width=2)
+
+
+# ═══════════════════════════════════════════════════
+#  CARD 2 — APPOINTMENT CARD (Height Reduced)
+# ═══════════════════════════════════════════════════
+def generate_appointment_card(name, role, location, profile_image, logo_image=None):
+    W, H = 660, 840  # <--- Height ko 1020 se kam karke 840 px kar diya hai
+    card = Image.new("RGBA", (W, H), "white")
+    draw = ImageDraw.Draw(card)
+
+    # Thick green outer border
+    draw.rectangle([10, 10, W - 11, H - 11], outline="#1a6b1a", width=8)
+    # Gold accent border
+    draw.rectangle([22, 22, W - 23, H - 23], outline="#D4AF37", width=2)
+
+    # ══ HEADER ══
+    logo = logo_image or load_default_logo()
+    logo_size = 75
+    logo_x, logo_y = 35, 35
+    if logo:
+        paste_logo(card, logo, logo_x, logo_y, logo_size)
+
+    # Logo label spacing close to logo
+    small_lbl = load_font("roboto_bold", 11)
+    draw.text((logo_x, logo_y + logo_size + 4), "Al-Meharban Foundation", fill="#1a6b1a", font=small_lbl)
+
+    # Foundation names and taglines
+    fn_font = load_font("roboto_bold", 24)
+    draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 38, fn_font, "#1a5c1a", W)
+
+    tg_font = load_font("roboto_bold", 13)
+    draw_centered_text(draw, "Every Life Matters, Every Smile Counts.", 72, tg_font, "#1a6b1a", W)
+    
+    tg2_font = load_font("roboto_regular", 11)
+    draw_centered_text(draw, "Together We Care, Together We Change", 94, tg2_font, "#555555", W)
+
+    # Gold divider
+    draw.rectangle([35, 140, W - 35, 143], fill="#D4AF37")
+
+    # ══ PROFILE PHOTO (Elegant Size) ══
+    pw, ph = 210, 240
+    px = (W - pw) // 2
+    py = 170
+    # Green frame
+    draw.rectangle([px - 4, py - 4, px + pw + 4, py + ph + 4], outline="#1a6b1a", width=4)
+
+    if profile_image is not None:
+        try:
+            iw, ih = profile_image.size
+            ta = pw / ph
+            if iw / ih > ta:
+                nw = int(ih * ta)
+                cropped = profile_image.crop(((iw - nw) // 2, 0, (iw - nw) // 2 + nw, ih))
+            else:
+                nh = int(iw / ta)
+                cropped = profile_image.crop((0, (ih - nh) // 2, iw, (ih - nh) // 2 + nh))
+            card.paste(cropped.resize((pw, ph), Image.Resampling.LANCZOS), (px, py))
+        except Exception:
+            _appt_placeholder_photo(draw, px, py, pw, ph)
+    else:
+        _appt_placeholder_photo(draw, px, py, pw, ph)
+
+    # ══ TEXT CONTENT (Positions adjusted upwards for shorter height) ══
+    cg_font = load_font("roboto_bold", 25)
+    draw_centered_text(draw, "HEARTIEST CONGRATULATIONS", 445, cg_font, "#1a5c1a", W)
+
+    ap_font = load_font("roboto_bold", 18)
+    draw_centered_text(draw, "On Appointment as " + role.strip(), 490, ap_font, "#111111", W)
+
+    org_font = load_font("roboto_bold", 21)
+    draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 525, org_font, "#1a5c1a", W)
+
+    if location.strip():
+        loc_font = load_font("roboto_bold", 15)
+        draw_centered_text(draw, "From " + location.strip(), 560, loc_font, "#111111", W)
+
+    # Name (large, bold green)
+    display_name = name.strip()
+    nm_font = get_autoscaled_font(draw, display_name, "roboto_bold", W - 80, 28)
+    draw_centered_text(draw, display_name, 595, nm_font, "#1a5c1a", W)
+
+    # Gold divider before footer
+    draw.rectangle([35, 735, W - 35, 738], fill="#D4AF37")
+
+    # Together tagline
+    tg3_font = load_font("roboto_bold", 13)
+    draw_centered_text(draw, "TOGETHER WE CARE, TOGETHER WE CHANGE", 750, tg3_font, "#111111", W)
+
+    # ══ FOOTER (Perfectly aligned with H=840) ══
+    draw.rectangle([24, 775, W - 24, 828], fill="#c8eac8")
+    ft_font = load_font("roboto_bold", 12)
+    draw_centered_text(draw, "Join us in making society!  |  Follow us Al-Meharban Foundation", 785, ft_font, "#1a4a1a", W)
+    sc_font = load_font("roboto_regular", 11)
+    draw_centered_text(draw, "f  /AlMeharbanFd        ig/al_meharban_foundation        tt/AlMeharban", 805, sc_font, "#333333", W)
+
+    return card
+
+
+def _appt_placeholder_photo(draw, px, py, pw, ph):
+    draw.rectangle([px, py, px + pw, py + ph], fill="#F0F0F0")
+    cx = px + pw // 2
+    draw.ellipse([cx - 45, py + 40, cx + 45, py + 130], fill="#CCCCCC")
+    draw.chord([cx - 80, py + 150, cx + 80, py + ph - 10], start=180, end=360, fill="#CCCCCC")
+
+
+# ═══════════════════════════════════════════════════
+#  STREAMLIT UI
+# ═══════════════════════════════════════════════════
+st.markdown('<h1 class="main-title">Al-Meharban Foundation</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Volunteer ID Card + Appointment Card — Ek Form, Dono Cards | Logo Automatic</p>',
+            unsafe_allow_html=True)
+
+col_form, col_preview = st.columns([5, 7])
 
 with col_form:
-    st.markdown('<div class="instructions">💡 <b>Instructions:</b> Fill out the volunteer information below and upload a profile picture. The card preview on the right will update in real-time. You can then download the result as a high-resolution PNG or print-ready PDF.</div>', unsafe_allow_html=True)
-    
-    st.subheader("Volunteer Information Form")
-    
-    # Volunteer details input fields
-    name = st.text_input("Full Name", value="Muhammad Bilal Ahmad", max_chars=40, help="Name of the volunteer (auto-scales if long)")
-    
-    col_row1_1, col_row1_2 = st.columns(2)
-    with col_row1_1:
-        volunteer_id = st.text_input("Volunteer ID", value="AMF-2026-9042", max_chars=20, help="Unique identifier, e.g. AMF-YYYY-XXXX")
-    with col_row1_2:
-        role = st.text_input("Role / Designation", value="Senior Welfare Officer", max_chars=35, help="Role, e.g. Welfare Officer, Educator, Medical Volunteer")
-        
-    col_row2_1, col_row2_2 = st.columns(2)
-    with col_row2_1:
-        blood_group = st.selectbox(
-            "Blood Group", 
-            options=["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-", "N/A"], 
-            index=0, 
-            help="Blood Group of the volunteer"
-        )
-    with col_row2_2:
-        validity_date = st.text_input("Validity Date", value="31-Dec-2027", max_chars=15, help="ID expiration date, e.g. 31-Dec-2027")
-        
+    st.subheader("Volunteer / Member Details")
+
+    name = st.text_input("Full Name", value="Muhammad Umair Ahmed", max_chars=40)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        volunteer_id = st.text_input("Volunteer ID", value="AMF-2026-0042", max_chars=20)
+    with c2:
+        blood_group = st.selectbox("Blood Group",
+            ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-", "N/A"])
+
+    c3, c4 = st.columns(2)
+    with c3:
+        role = st.text_input("Role / Designation", value="Community Leader", max_chars=40)
+    with c4:
+        validity_date = st.text_input("ID Valid Until", value="31-Dec-2027", max_chars=15)
+
+    location = st.text_input("City / Area (Appointment Card)", value="Malir Karachi", max_chars=40)
+
+    title_prefix = st.radio("Title for Appointment Card", ["Mr.", "Ms.", "Dr.", "None"], horizontal=True)
+
     st.markdown("---")
-    st.subheader("Profile Photo Upload")
-    
-    # Photo Upload Component (supports JPG, JPEG, PNG, PDF)
-    uploaded_file = st.file_uploader(
-        "Upload Volunteer Photo (supports PNG, JPG, JPEG or PDF)",
-        type=["png", "jpg", "jpeg", "pdf"],
-        help="Upload a portrait photo. If a PDF is uploaded, the first page will be automatically extracted."
-    )
-    
-    st.subheader("Signature Upload")
-    uploaded_sig = st.file_uploader(
-        "Upload Signature Image (optional, supports PNG, JPG, JPEG)",
-        type=["png", "jpg", "jpeg"],
-        help="Upload a signature image to replace the default signature."
-    )
-    
-    # Process uploaded profile image (including PDF extraction)
-    profile_image = None
-    if uploaded_file is not None:
-        file_name = uploaded_file.name.lower()
-        if file_name.endswith('.pdf'):
-            try:
-                import fitz as _fitz  # PyMuPDF (lazy import)
-            except ImportError:
-                _fitz = None
-                st.warning("⚠️ Standard PDF processing library 'pymupdf' is not available. Please upload PNG/JPG format directly, or make sure PyMuPDF is installed.")
+    st.subheader("Profile Photo")
+    uploaded_file = st.file_uploader("Upload Photo (PNG, JPG)", type=["png", "jpg", "jpeg"])
 
-            if _fitz is not None:
-                try:
-                    # Read bytes and load PDF
-                    pdf_bytes = uploaded_file.read()
-                    doc = _fitz.open(stream=pdf_bytes, filetype="pdf")
-                    if len(doc) > 0:
-                        page = doc.load_page(0)
-                        # Extract page with 150 DPI for standard photo crop
-                        pix = page.get_pixmap(dpi=150)
-                        img_data = pix.tobytes("png")
-                        profile_image = Image.open(io.BytesIO(img_data))
-                    else:
-                        st.error("The uploaded PDF has no pages.")
-                except Exception as e:
-                    st.error(f"Error extracting image from PDF: {e}")
-        else:
-            try:
-                # Open directly using PIL
-                profile_image = Image.open(uploaded_file)
-            except Exception as e:
-                st.error(f"Error loading image file: {e}")
+    st.subheader("Foundation Logo (optional override)")
+    st.info("✅ Al-Meharban Foundation ka official logo already set hai. Sirf override karna ho to upload karein.")
+    uploaded_logo = st.file_uploader("Upload Custom Logo (PNG recommended)", type=["png", "jpg", "jpeg"])
 
-# Process uploaded signature image
+    st.subheader("Signature (optional)")
+    uploaded_sig = st.file_uploader("Upload Signature Image", type=["png", "jpg", "jpeg"])
+
+# Process images
+profile_image = None
+if uploaded_file:
+    try:
+        profile_image = Image.open(uploaded_file)
+    except Exception as e:
+        st.error(f"Photo error: {e}")
+
+logo_image = None
+if uploaded_logo:
+    try:
+        logo_image = Image.open(uploaded_logo).convert("RGBA")
+    except Exception as e:
+        st.error(f"Logo error: {e}")
+
 signature_image = None
-if uploaded_sig is not None:
+if uploaded_sig:
     try:
         signature_image = Image.open(uploaded_sig)
     except Exception as e:
-        st.error(f"Error loading signature image: {e}")
+        st.error(f"Signature error: {e}")
 
-# Generate the ID card using Pillow Canvas Engine
+# Build display name for appointment card
+def _appt_name(name, prefix):
+    if prefix == "None":
+        return name.strip()
+    return f"{prefix} {name.strip()}"
+
+# Generate both cards
 id_card = generate_id_card(
-    name=name,
-    volunteer_id=volunteer_id,
-    role=role,
-    blood_group=blood_group,
-    validity_date=validity_date,
+    name=name, volunteer_id=volunteer_id, role=role,
+    blood_group=blood_group, validity_date=validity_date,
+    profile_image=profile_image, signature_image=signature_image,
+    logo_image=logo_image
+)
+
+appt_card = generate_appointment_card(
+    name=_appt_name(name, title_prefix),
+    role=role, location=location,
     profile_image=profile_image,
-    signature_image=signature_image
+    logo_image=logo_image
 )
 
 with col_preview:
-    st.subheader("ID Card Live Preview")
-    
-    # Display the generated card
-    st.image(id_card, caption="Vertical CR80 standard card preview (660 x 1020 pixels)", width="stretch")
-    
-    st.markdown("### Export options")
-    
-    # Prepare PNG bytes
-    png_buf = io.BytesIO()
-    id_card.save(png_buf, format="PNG", dpi=(300, 300))
-    png_bytes = png_buf.getvalue()
-    
-    # Prepare PDF bytes (must convert to RGB first as PDF does not support RGBA transparency)
-    pdf_buf = io.BytesIO()
-    rgb_card = id_card.convert("RGB")
-    rgb_card.save(pdf_buf, format="PDF", resolution=300.0)
-    pdf_bytes = pdf_buf.getvalue()
-    
-    # Standard printable file name format
-    file_base_name = f"AMF_ID_{name.replace(' ', '_')}"
-    
-    # Streamlit layout for side-by-side download buttons
-    col_dl_png, col_dl_pdf = st.columns(2)
-    with col_dl_png:
-        st.download_button(
-            label="⬇️ Download PNG",
-            data=png_bytes,
-            file_name=f"{file_base_name}.png",
-            mime="image/png"
-        )
-    with col_dl_pdf:
-        st.download_button(
-            label="⬇️ Download PDF",
-            data=pdf_bytes,
-            file_name=f"{file_base_name}.pdf",
-            mime="application/pdf"
-        )
+    tab1, tab2 = st.tabs(["🪪  Volunteer ID Card", "🎖️  Appointment Card"])
+
+    with tab1:
+        st.markdown('<div class="card-label">Volunteer ID Card Preview</div>', unsafe_allow_html=True)
+        st.image(id_card, caption="660 × 1020 px — Print Ready", use_container_width=True)
+
+        png1 = io.BytesIO()
+        id_card.save(png1, format="PNG", dpi=(300, 300))
+        pdf1 = io.BytesIO()
+        id_card.convert("RGB").save(pdf1, format="PDF", resolution=300.0)
+
+        ca, cb = st.columns(2)
+        with ca:
+            st.download_button("⬇️ Download ID PNG",
+                               png1.getvalue(),
+                               f"AMF_ID_{name.replace(' ','_')}.png", "image/png")
+        with cb:
+            st.download_button("⬇️ Download ID PDF",
+                               pdf1.getvalue(),
+                               f"AMF_ID_{name.replace(' ','_')}.pdf", "application/pdf")
+
+    with tab2:
+        st.markdown('<div class="card-label">Appointment Card Preview</div>', unsafe_allow_html=True)
+        st.image(appt_card, caption="660 × 1020 px — Print & Social Ready", use_container_width=True)
+
+        png2 = io.BytesIO()
+        appt_card.save(png2, format="PNG", dpi=(300, 300))
+        pdf2 = io.BytesIO()
+        appt_card.convert("RGB").save(pdf2, format="PDF", resolution=300.0)
+
+        cc, cd = st.columns(2)
+        with cc:
+            st.download_button("⬇️ Download Appt. PNG",
+                               png2.getvalue(),
+                               f"AMF_Appt_{name.replace(' ','_')}.png", "image/png")
+        with cd:
+            st.download_button("⬇️ Download Appt. PDF",
+                               pdf2.getvalue(),
+                               f"AMF_Appt_{name.replace(' ','_')}.pdf", "application/pdf")
+
+    st.markdown("---")
+    st.caption("💡 Dono cards ek saath tayar hain — tabs switch karke alag alag download karein.")
