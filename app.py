@@ -11,6 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
+# ── STREAMLIT CUSTOM DESIGN STYLING ──
 st.markdown("""
     <style>
     .main-title {
@@ -38,7 +39,7 @@ st.markdown("""
 FONT_DIR = "fonts"
 os.makedirs(FONT_DIR, exist_ok=True)
 
-# ── Robust logo path resolution — tries multiple locations ──
+# ── LOGO FILE PATH AUTO-DETECTION ──
 def _find_logo_path():
     candidates = []
     try:
@@ -148,8 +149,9 @@ def load_default_logo():
             pass
     return None
 
+
 # ═══════════════════════════════════════════════════
-#  CARD 1 — VOLUNTEER ID CARD  (660 × 1020)
+#  CARD 1 — VOLUNTEER ID CARD  (660 × 1020 px)
 # ═══════════════════════════════════════════════════
 def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
                      profile_image, signature_image=None, logo_image=None):
@@ -163,7 +165,7 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
     draw.rectangle([14, 14, 646, 185], fill="#005A2D")
     draw.rectangle([14, 185, 646, 191], fill="#D4AF37")
 
-    # ── Problem 1 Solution: Logo Centered in Header ──
+    # ── Problem 1 Fix: Logo Perfectly Centered ──
     logo = logo_image or load_default_logo()
     if logo:
         logo_bg_size = 80
@@ -173,7 +175,7 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
     else:
         draw.ellipse([305, 25, 355, 75], fill="#005A2D", outline="#D4AF37", width=2)
 
-    # Header text shifted cleanly downwards to look professional below the centered logo
+    # Header texts shifted down beneath centered logo
     header_font = load_font("roboto_bold", 22)
     draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 104, header_font, "white", 660)
     sub_font = load_font("roboto_regular", 13)
@@ -181,7 +183,7 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
     tagline_font = load_font("roboto_regular", 11)
     draw_centered_text(draw, "Together We Care, Together We Change", 158, tagline_font, "#aaddaa", 660)
 
-    # ── Profile photo ──
+    # ── Profile Photo Frame & Paste ──
     px1, py1, px2, py2 = 220, 215, 440, 475
     draw.rectangle([px1 - 3, py1 - 3, px2 + 3, py2 + 3], outline="#CCCCCC", width=3)
     if profile_image is not None:
@@ -201,13 +203,13 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
     else:
         _placeholder_photo(draw, px1, py1, px2, py2)
 
-    # ── Name & Role ──
+    # ── Professional Name & Role Formatting ──
     name_font = get_autoscaled_font(draw, name.strip(), "roboto_bold", 520, 30)
     draw_centered_text(draw, name.strip(), 510, name_font, "#005A2D", 660)
     role_font = get_autoscaled_font(draw, role.strip(), "roboto_medium", 520, 20)
     draw_centered_text(draw, role.strip(), 555, role_font, "#B46400", 660)
 
-    # ── Info grid ──
+    # ── Information Data Grid ──
     draw.rectangle([80, 610, 580, 790], fill="#F7FBF8", outline="#E2ECE5", width=2)
     lf = load_font("roboto_bold", 16)
     vf = load_font("roboto_medium", 16)
@@ -219,7 +221,7 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
         draw.text((115, ry), label, fill="#555555", font=lf)
         draw.text((300, ry), val,   fill=vc,        font=vf)
 
-    # ── Barcode ──
+    # ── Barcode Logic ──
     random.seed(volunteer_id)
     bx = 90
     while bx < 270:
@@ -228,7 +230,7 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
         bx += bw + random.choice([2, 3])
     draw.text((120, 882), f"*{volunteer_id.strip().upper()}*", fill="#555555", font=load_font("roboto_regular", 11))
 
-    # ── Problem 2 Solution: Actual Signature Image ──
+    # ── Problem 2 Fix: Actual Signature Loader ──
     draw.line([390, 865, 570, 865], fill="#888888", width=2)
     sig = signature_image
     if sig is None and os.path.exists("signature_no_bg.png"):
@@ -257,14 +259,13 @@ def generate_id_card(name, volunteer_id, role, blood_group, validity_date,
         
     draw.text((410, 873), "AUTHORIZED SIGNATURE", fill="#777777", font=load_font("roboto_bold", 10))
 
-    # ── Footer ──
+    # ── Bottom ID Footer ──
     draw.rectangle([14, 940, 646, 946], fill="#D4AF37")
     draw.rectangle([14, 946, 646, 1006], fill="#005A2D")
     draw_centered_text(draw, "If found, please return to office or contact admin.",
                        965, load_font("roboto_regular", 12), "white", 660)
 
     return card
-
 
 def _placeholder_photo(draw, x1, y1, x2, y2):
     draw.rectangle([x1, y1, x2, y2], fill="#F0F0F0")
@@ -277,47 +278,46 @@ def _fallback_sig(draw):
 
 
 # ═══════════════════════════════════════════════════
-#  CARD 2 — APPOINTMENT CARD (Height Reduced)
+#  CARD 2 — APPOINTMENT CARD (660 × 760 px - Optimized)
 # ═══════════════════════════════════════════════════
 def generate_appointment_card(name, role, location, profile_image, logo_image=None):
-    W, H = 660, 840  # <--- Height ko 1020 se kam karke 840 px kar diya hai
+    W, H = 660, 760  # Height perfectly condensed for professional compact look
     card = Image.new("RGBA", (W, H), "white")
     draw = ImageDraw.Draw(card)
 
-    # Thick green outer border
+    # Dark green outer border
     draw.rectangle([10, 10, W - 11, H - 11], outline="#1a6b1a", width=8)
-    # Gold accent border
+    # Gold accent frame line
     draw.rectangle([22, 22, W - 23, H - 23], outline="#D4AF37", width=2)
 
-    # ══ HEADER ══
+    # ══ HEADER SECTION ══
     logo = logo_image or load_default_logo()
-    logo_size = 75
+    logo_size = 70
     logo_x, logo_y = 35, 35
     if logo:
         paste_logo(card, logo, logo_x, logo_y, logo_size)
 
-    # Logo label spacing close to logo
+    # Problem 3 Fix: Closed tight spacing directly under the logo
     small_lbl = load_font("roboto_bold", 11)
-    draw.text((logo_x, logo_y + logo_size + 4), "Al-Meharban Foundation", fill="#1a6b1a", font=small_lbl)
+    draw.text((logo_x, logo_y + logo_size + 3), "Al-Meharban Foundation", fill="#1a6b1a", font=small_lbl)
 
-    # Foundation names and taglines
-    fn_font = load_font("roboto_bold", 24)
+    # Foundation structured typography
+    fn_font = load_font("roboto_bold", 22)
     draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 38, fn_font, "#1a5c1a", W)
 
     tg_font = load_font("roboto_bold", 13)
-    draw_centered_text(draw, "Every Life Matters, Every Smile Counts.", 72, tg_font, "#1a6b1a", W)
+    draw_centered_text(draw, "Every Life Matters, Every Smile Counts.", 70, tg_font, "#1a6b1a", W)
     
     tg2_font = load_font("roboto_regular", 11)
-    draw_centered_text(draw, "Together We Care, Together We Change", 94, tg2_font, "#555555", W)
+    draw_centered_text(draw, "Together We Care, Together We Change", 90, tg2_font, "#555555", W)
 
-    # Gold divider
-    draw.rectangle([35, 140, W - 35, 143], fill="#D4AF37")
+    # Gold Divider Line
+    draw.rectangle([35, 130, W - 35, 133], fill="#D4AF37")
 
-    # ══ PROFILE PHOTO (Elegant Size) ══
-    pw, ph = 210, 240
+    # ══ PROFILE PHOTO (Proportional & Professional Size) ══
+    pw, ph = 190, 215
     px = (W - pw) // 2
-    py = 170
-    # Green frame
+    py = 155
     draw.rectangle([px - 4, py - 4, px + pw + 4, py + ph + 4], outline="#1a6b1a", width=4)
 
     if profile_image is not None:
@@ -336,41 +336,40 @@ def generate_appointment_card(name, role, location, profile_image, logo_image=No
     else:
         _appt_placeholder_photo(draw, px, py, pw, ph)
 
-    # ══ TEXT CONTENT (Positions adjusted upwards for shorter height) ══
-    cg_font = load_font("roboto_bold", 25)
-    draw_centered_text(draw, "HEARTIEST CONGRATULATIONS", 445, cg_font, "#1a5c1a", W)
+    # ══ TEXT CONTENT (Balanced Font Sizes & Clean Positions) ══
+    cg_font = load_font("roboto_bold", 22)
+    draw_centered_text(draw, "HEARTIEST CONGRATULATIONS", 400, cg_font, "#1a5c1a", W)
 
-    ap_font = load_font("roboto_bold", 18)
-    draw_centered_text(draw, "On Appointment as " + role.strip(), 490, ap_font, "#111111", W)
+    ap_font = load_font("roboto_bold", 16)
+    draw_centered_text(draw, "On Appointment as " + role.strip(), 440, ap_font, "#111111", W)
 
-    org_font = load_font("roboto_bold", 21)
-    draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 525, org_font, "#1a5c1a", W)
+    org_font = load_font("roboto_bold", 19)
+    draw_centered_text(draw, "AL-MEHARBAN FOUNDATION", 470, org_font, "#1a5c1a", W)
 
     if location.strip():
-        loc_font = load_font("roboto_bold", 15)
-        draw_centered_text(draw, "From " + location.strip(), 560, loc_font, "#111111", W)
+        loc_font = load_font("roboto_bold", 14)
+        draw_centered_text(draw, "From " + location.strip(), 500, loc_font, "#111111", W)
 
-    # Name (large, bold green)
+    # Auto-scaled green Candidate Name
     display_name = name.strip()
-    nm_font = get_autoscaled_font(draw, display_name, "roboto_bold", W - 80, 28)
-    draw_centered_text(draw, display_name, 595, nm_font, "#1a5c1a", W)
+    nm_font = get_autoscaled_font(draw, display_name, "roboto_bold", W - 80, 26)
+    draw_centered_text(draw, display_name, 530, nm_font, "#1a5c1a", W)
 
-    # Gold divider before footer
-    draw.rectangle([35, 735, W - 35, 738], fill="#D4AF37")
+    # Gold separator line before footer
+    draw.rectangle([35, 655, W - 35, 658], fill="#D4AF37")
 
-    # Together tagline
-    tg3_font = load_font("roboto_bold", 13)
-    draw_centered_text(draw, "TOGETHER WE CARE, TOGETHER WE CHANGE", 750, tg3_font, "#111111", W)
+    # Bottom Tagline
+    tg3_font = load_font("roboto_bold", 12)
+    draw_centered_text(draw, "TOGETHER WE CARE, TOGETHER WE CHANGE", 670, tg3_font, "#111111", W)
 
-    # ══ FOOTER (Perfectly aligned with H=840) ══
-    draw.rectangle([24, 775, W - 24, 828], fill="#c8eac8")
-    ft_font = load_font("roboto_bold", 12)
-    draw_centered_text(draw, "Join us in making society!  |  Follow us Al-Meharban Foundation", 785, ft_font, "#1a4a1a", W)
-    sc_font = load_font("roboto_regular", 11)
-    draw_centered_text(draw, "f  /AlMeharbanFd        ig/al_meharban_foundation        tt/AlMeharban", 805, sc_font, "#333333", W)
+    # ══ CONSOLIDATED FOOTER ══
+    draw.rectangle([24, 695, W - 24, 748], fill="#c8eac8")
+    ft_font = load_font("roboto_bold", 11)
+    draw_centered_text(draw, "Join us in making society!  |  Follow us Al-Meharban Foundation", 703, ft_font, "#1a4a1a", W)
+    sc_font = load_font("roboto_regular", 10)
+    draw_centered_text(draw, "f  /AlMeharbanFd        ig/al_meharban_foundation        tt/AlMeharban", 723, sc_font, "#333333", W)
 
     return card
-
 
 def _appt_placeholder_photo(draw, px, py, pw, ph):
     draw.rectangle([px, py, px + pw, py + ph], fill="#F0F0F0")
@@ -380,7 +379,7 @@ def _appt_placeholder_photo(draw, px, py, pw, ph):
 
 
 # ═══════════════════════════════════════════════════
-#  STREAMLIT UI
+#  STREAMLIT GENERATOR UI FRONTEND
 # ═══════════════════════════════════════════════════
 st.markdown('<h1 class="main-title">Al-Meharban Foundation</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">Volunteer ID Card + Appointment Card — Ek Form, Dono Cards | Logo Automatic</p>',
@@ -421,7 +420,7 @@ with col_form:
     st.subheader("Signature (optional)")
     uploaded_sig = st.file_uploader("Upload Signature Image", type=["png", "jpg", "jpeg"])
 
-# Process images
+# Image Processors
 profile_image = None
 if uploaded_file:
     try:
@@ -443,13 +442,12 @@ if uploaded_sig:
     except Exception as e:
         st.error(f"Signature error: {e}")
 
-# Build display name for appointment card
 def _appt_name(name, prefix):
     if prefix == "None":
         return name.strip()
     return f"{prefix} {name.strip()}"
 
-# Generate both cards
+# Generator Execution
 id_card = generate_id_card(
     name=name, volunteer_id=volunteer_id, role=role,
     blood_group=blood_group, validity_date=validity_date,
@@ -488,7 +486,7 @@ with col_preview:
 
     with tab2:
         st.markdown('<div class="card-label">Appointment Card Preview</div>', unsafe_allow_html=True)
-        st.image(appt_card, caption="660 × 1020 px — Print & Social Ready", use_container_width=True)
+        st.image(appt_card, caption="660 × 760 px — Compact & Social Media Ready", use_container_width=True)
 
         png2 = io.BytesIO()
         appt_card.save(png2, format="PNG", dpi=(300, 300))
