@@ -18,7 +18,7 @@ st.markdown("""
         color: #005A2D;
         font-weight: 800;
         font-size: 2.4rem;
-        margin-bottom: 0;
+        margin-bottom: 10;
     }
     .sub-title { color: #666; font-size: 1rem; margin-bottom: 24px; }
     .card-label { font-weight: 700; font-size: 1.1rem; color: #005A2D; margin-bottom: 6px; }
